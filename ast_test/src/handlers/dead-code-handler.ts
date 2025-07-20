@@ -1,8 +1,9 @@
-import * as parser from "@babel/parser";
 import traverse from "@babel/traverse";
 import generate from "@babel/generator";
 import { Node } from "@babel/types";
 import * as t from "@babel/types";
+
+import { parseCode } from "@utils/index";
 
 interface DeadCodeResult {
   unreachableCode: Array<{
@@ -28,31 +29,6 @@ interface ControlFlowGraph {
   nodes: Map<number, CFGNode>;
   entry: number;
   nodeCounter: number;
-}
-
-// TODO: parser定制化
-function parseCode(code: string) {
-  // 基本校验
-  if (!code || typeof code !== "string") {
-    throw new Error("Code must be a non-empty string");
-  }
-
-  // 语法校验
-  if (code.trim().length === 0) {
-    throw new Error("Code cannot be empty");
-  }
-
-  try {
-    return parser.parse(code, {
-      sourceType: "module",
-      plugins: ["typescript", "jsx"],
-      strictMode: false,
-    });
-  } catch (error) {
-    throw new Error(
-      `Parse error: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
-  }
 }
 
 export default function deadCodeHandler(code: string): DeadCodeResult {

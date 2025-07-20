@@ -1,6 +1,5 @@
-export * as fileProcessor from './file-processor';
-import deadCodeHandler from './dead-code-handler';
+import parseCode  from "./parseCode";
 
 export {
-  deadCodeHandler
+  parseCode
 }

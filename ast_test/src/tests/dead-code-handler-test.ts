@@ -1,4 +1,4 @@
-import { fileProcessor, deadCodeHandler } from "@utils/index";
+import { fileProcessor, deadCodeHandler } from "@handlers/index";
 import path from "path";
 
 const { readFileAsync, writeFileAsync } = fileProcessor;
