@@ -27,6 +27,7 @@ export const writeFileAsync = async (
 };
 
 const validateFilePath = (filePath: string): void => {
+
   // 1. 基本检查
   if (!filePath || typeof filePath !== "string") {
     throw new Error("File path must be a non-empty string");
