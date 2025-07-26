@@ -1,4 +1,4 @@
-import traverse from "@babel/traverse";
+import traverse, { NodePath } from "@babel/traverse";
 import generate from "@babel/generator";
 import * as t from "@babel/types";
 
@@ -28,6 +28,15 @@ function removeUnusedVar(code: string): UnusedVarResult {
   const ast = parseCode(code);
   const unusedVariables: Array<{ name: string; line: number; column: number }> = [];
   const unusedFunctions: Array<{ name: string; line: number; column: number }> = [];
+  
+  // 验证输入
+  if (!code.trim()) {
+    return {
+      unusedVariables: [],
+      unusedFunctions: [],
+      cleanedCode: code
+    };
+  }
 
   traverse(ast, {
     VariableDeclarator(path) {
@@ -36,7 +45,8 @@ function removeUnusedVar(code: string): UnusedVarResult {
         const varName = path.node.id.name;
         const binding = path.scope.getBinding(varName);
         
-        if (binding && binding.references === 0) {
+        // 检查 binding 是否存在且 referenced 为 0
+        if (binding && binding.referenced === false) {
           // 判断是函数还是普通变量
           const isFunction = 
           t.isFunctionExpression(path.node.init) ||
@@ -77,7 +87,7 @@ function removeUnusedVar(code: string): UnusedVarResult {
         const funcName = path.node.id.name;
         const binding = path.scope.getBinding(funcName);
         
-        if (binding && binding.references === 0) {
+        if (binding && binding.referenced === false) {
           // 记录未使用的函数
           if (path.node.id.loc) {
             unusedFunctions.push({
@@ -113,7 +123,10 @@ function removeUnusedVar(code: string): UnusedVarResult {
   };
 }
 
-function checkUnusedFunctionParams(path: any, unusedVariables: Array<{ name: string; line: number; column: number }>) {
+function checkUnusedFunctionParams(
+  path: NodePath<t.Function>, 
+  unusedVariables: Array<{ name: string; line: number; column: number }>
+) {
   const params = path.node.params;
   
   for (const param of params) {
@@ -121,8 +134,9 @@ function checkUnusedFunctionParams(path: any, unusedVariables: Array<{ name: str
       const paramName = param.name;
       const binding = path.scope.getBinding(paramName);
       
-      if (binding && binding.references === 0) {
-        // 函数参数未使用，但通常不删除参数，只报告
+      if (binding && binding.referenced === false) {
+        // 函数参数未使用，但不删除参数以保持函数签名
+        // 只记录到未使用变量列表中供参考
         if (param.loc) {
           unusedVariables.push({
             name: paramName,

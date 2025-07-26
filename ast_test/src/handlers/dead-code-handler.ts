@@ -15,22 +15,6 @@ interface DeadCodeResult {
   cleanedCode: string;
 }
 
-// 函数式CFG节点
-interface CFGNode {
-  id: number;
-  statements: t.Statement[];
-  successors: number[];
-  predecessors: number[];
-  reachable: boolean;
-}
-
-// 函数式CFG
-interface ControlFlowGraph {
-  nodes: Map<number, CFGNode>;
-  entry: number;
-  nodeCounter: number;
-}
-
 export default function deadCodeHandler(code: string): DeadCodeResult {
   const ast = parseCode(code);
   const result: DeadCodeResult = {
@@ -235,143 +219,12 @@ function removeStatementsFromProgram(program: t.Program, toRemove: t.Statement[]
   program.body = program.body.filter(stmt => !removeSet.has(stmt));
 }
 
-function createCFG(): ControlFlowGraph {
-  const cfg: ControlFlowGraph = {
-    nodes: new Map(),
-    entry: 0,
-    nodeCounter: 1,
-  };
-
-  // 创建入口节点
-  const entryNode: CFGNode = {
-    id: 0,
-    statements: [],
-    successors: [],
-    predecessors: [],
-    reachable: false,
-  };
-  cfg.nodes.set(0, entryNode);
-
-  return cfg;
-}
-
-function addEdge(cfg: ControlFlowGraph, fromId: number, toId: number) {
-  const fromNode = cfg.nodes.get(fromId);
-  const toNode = cfg.nodes.get(toId);
-
-  if (fromNode && toNode) {
-    if (!fromNode.successors.includes(toId)) {
-      fromNode.successors.push(toId);
-      toNode.predecessors.push(fromId);
-    }
-  }
-}
-
-function buildCFGFromStatements(statements: t.Statement[]): ControlFlowGraph {
-  const cfg = createCFG();
-  let currentNodeId = cfg.entry;
-
-  for (const stmt of statements) {
-    currentNodeId = processStatement(cfg, currentNodeId, stmt);
-  }
-
-  return cfg;
-}
-
-function processStatement(
-  cfg: ControlFlowGraph,
-  currentNodeId: number,
-  stmt: t.Statement
-): number {
-  switch (true) {
-    case t.isBlockStatement(stmt):
-      return processBlockStatement(cfg, currentNodeId, stmt);
-    case t.isIfStatement(stmt):
-      return processIfStatement(cfg, currentNodeId, stmt);
-    case (t.isReturnStatement(stmt) || t.isThrowStatement(stmt)):
-      return processTerminatorStatement(cfg, currentNodeId, stmt);
-    default: {
-      // 普通语句：添加到当前节点
-      const currentNode = cfg.nodes.get(currentNodeId);
-      if (currentNode) {
-        currentNode.statements.push(stmt);
-      }
-      return currentNodeId;
-    }
-  }
-}
-
-function processBlockStatement(
-  cfg: ControlFlowGraph,
-  currentNodeId: number,
-  stmt: t.BlockStatement
-): number {
-  let nodeId = currentNodeId;
-  for (const innerStmt of stmt.body) {
-    nodeId = processStatement(cfg, nodeId, innerStmt);
-  }
-  return nodeId;
-}
-
-function processIfStatement(
-  cfg: ControlFlowGraph,
-  currentNodeId: number,
-  stmt: t.IfStatement
-): number {
-  // 创建分支节点
-  const thenNodeId = createNode(cfg);
-  const elseNodeId = createNode(cfg);
-  const afterNodeId = createNode(cfg);
-
-  // 连接分支
-  addEdge(cfg, currentNodeId, thenNodeId);
-  addEdge(cfg, currentNodeId, elseNodeId);
-
-  // 处理then分支
-  let thenEndNodeId = processStatement(cfg, thenNodeId, stmt.consequent);
-  const thenNode = cfg.nodes.get(thenEndNodeId);
-  if (thenNode && thenNode.successors.length === 0) {
-    addEdge(cfg, thenEndNodeId, afterNodeId);
-  }
-
-  // 处理else分支
-  let elseEndNodeId = elseNodeId;
-  if (stmt.alternate) {
-    elseEndNodeId = processStatement(cfg, elseNodeId, stmt.alternate);
-  }
-  const elseNode = cfg.nodes.get(elseEndNodeId);
-  if (elseNode && elseNode.successors.length === 0) {
-    addEdge(cfg, elseEndNodeId, afterNodeId);
-  }
-
-  return afterNodeId;
-}
-
-function processTerminatorStatement(
-  cfg: ControlFlowGraph,
-  currentNodeId: number,
-  stmt: t.ReturnStatement | t.ThrowStatement
-): number {
-  const currentNode = cfg.nodes.get(currentNodeId);
-  if (currentNode) {
-    currentNode.statements.push(stmt);
-  }
-  // 创建新节点但不连接（不可达）
-  return createNode(cfg);
-}
-
-function createNode(
-  cfg: ControlFlowGraph,
-  statements: t.Statement[] = []
-): number {
-  const nodeId = cfg.nodeCounter++;
-  const node: CFGNode = {
-    id: nodeId,
-    statements: [...statements],
-    successors: [],
-    predecessors: [],
-    reachable: false,
-  };
-  cfg.nodes.set(nodeId, node);
-  return nodeId;
-}
+// 注释掉未使用的CFG相关函数
+// function createCFG(): ControlFlowGraph { ... }
+// function addEdge(cfg: ControlFlowGraph, fromId: number, toId: number) { ... }
+// function buildCFGFromStatements(statements: t.Statement[]): ControlFlowGraph { ... }
+// function processStatement(...) { ... }
+// function processBlockStatement(...) { ... }
+// function processIfStatement(...) { ... }
+// function processTerminatorStatement(...) { ... }
+// function createNode(...) { ... }

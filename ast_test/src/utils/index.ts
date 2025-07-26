@@ -1,5 +1,1 @@
-import parseCode  from "./parseCode";
-
-export {
-  parseCode
-}
+export { default as parseCode } from "./parseCode";
