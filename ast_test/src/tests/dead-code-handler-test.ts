@@ -9,5 +9,5 @@ readFileAsync(filePath).then((code) => {
   const res = deadCodeHandler(code)
   const p = path.join(__dirname, "../../output/dead-code-output.js")
   // console.log('dead-code-handler-test', res)
-  writeFileAsync(p, res.cleanedCode)
+  writeFileAsync(p, res)
 });

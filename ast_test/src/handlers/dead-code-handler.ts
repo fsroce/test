@@ -1,230 +1,103 @@
 import traverse from "@babel/traverse";
 import generate from "@babel/generator";
-import { Node } from "@babel/types";
 import * as t from "@babel/types";
 
 import { parseCode } from "@utils/index";
 
-interface DeadCodeResult {
-  unreachableCode: Array<{
-    line: number;
-    column: number;
-    code: string;
-    reason: string;
-  }>;
-  cleanedCode: string;
-}
-
-export default function deadCodeHandler(code: string): DeadCodeResult {
+export default function deadCodeHandler(code: string): string {
   const ast = parseCode(code);
-  const result: DeadCodeResult = {
-    unreachableCode: [],
-    cleanedCode: code,
-  };
-
-  // 一次遍历同时检测和移除
-  findAndRemoveDeadCode(ast, result);
-
-  return result;
-}
-
-function findAndRemoveDeadCode(ast: Node, result: DeadCodeResult) {
-  // 完整控制流分析
+  
   traverse(ast, {
-    Function(path) {
-      const functionBody = path.node.body;
-      if (t.isBlockStatement(functionBody)) {
-        const unreachableStmts = analyzeControlFlow(functionBody.body);
-        
-        // 记录不可达代码信息
-        for (const stmt of unreachableStmts) {
-          if (stmt.loc) {
-            result.unreachableCode.push({
-              line: stmt.loc.start.line,
-              column: stmt.loc.start.column,
-              code: getCodeFromNode(stmt),
-              reason: 'Unreachable code detected by control flow analysis'
-            });
-          }
+    // 优化 if 语句
+    IfStatement(path) {
+      const { test, consequent, alternate } = path.node;
+      
+      // if (true) -> 直接用 then 分支替换
+      if (t.isBooleanLiteral(test) && test.value) {
+        path.replaceWith(consequent);
+        return;
+      }
+      
+      // if (false) -> 用 else 分支替换，如果没有 else 就删除
+      if (t.isBooleanLiteral(test) && !test.value) {
+        if (alternate) {
+          path.replaceWith(alternate);
+        } else {
+          path.remove();
         }
-        
-        // 从AST中移除不可达代码
-        removeStatementsFromBlock(functionBody, unreachableStmts);
+        return;
       }
     },
     
-    Program(path) {
-      const unreachableStmts = analyzeControlFlow(path.node.body);
+    // 优化 switch 语句
+    SwitchStatement(path) {
+      const { discriminant, cases } = path.node;
+
+      // 只处理字面量常量
+      if (t.isStringLiteral(discriminant) || t.isNumericLiteral(discriminant)) {
+        const targetValue = discriminant.value;
+        const executeStatements: t.Statement[] = [];
+        let startExecuting = false;
+        
+        // 找到匹配的 case，然后执行所有后续 case（fall-through）
+        for (const caseNode of cases) {
+          // 开始执行条件：匹配的case 或 已经在执行中 或 default case
+          if (!startExecuting) {
+            if (caseNode.test === null) {
+              // default case
+              startExecuting = true;
+            } else if (t.isStringLiteral(caseNode.test) || t.isNumericLiteral(caseNode.test)) {
+              if (caseNode.test.value === targetValue) {
+                startExecuting = true;
+              }
+            }
+          }
+          
+          if (startExecuting) {
+            executeStatements.push(...caseNode.consequent);
+            
+            // 检查是否有 break，如果有就停止
+            const hasBreak = caseNode.consequent.some(stmt => t.isBreakStatement(stmt));
+            if (hasBreak) {
+              // 移除 break 语句，用块语句包装保持作用域
+              const filteredStatements = executeStatements.filter(stmt => !t.isBreakStatement(stmt));
+              const blockStatement = t.blockStatement(filteredStatements);
+              path.replaceWith(blockStatement);
+              return;
+            }
+          }
+        }
+        
+        // 没有 break，执行所有匹配的语句
+        if (executeStatements.length > 0) {
+          const blockStatement = t.blockStatement(executeStatements);
+          path.replaceWith(blockStatement);
+        } else {
+          path.remove();
+        }
+        return;
+      }
+    },
+    
+    // 移除 return/throw 后的死代码
+    BlockStatement(path) {
+      const statements = path.node.body;
+      let terminatorIndex = -1;
       
-      // 记录不可达代码信息
-      for (const stmt of unreachableStmts) {
-        if (stmt.loc) {
-          result.unreachableCode.push({
-            line: stmt.loc.start.line,
-            column: stmt.loc.start.column,
-            code: getCodeFromNode(stmt),
-            reason: 'Unreachable code detected by control flow analysis'
-          });
+      // 找到第一个终止语句
+      for (let i = 0; i < statements.length; i++) {
+        if (t.isReturnStatement(statements[i]) || t.isThrowStatement(statements[i])) {
+          terminatorIndex = i;
+          break;
         }
       }
       
-      // 从AST中移除不可达代码
-      removeStatementsFromProgram(path.node, unreachableStmts);
+      // 移除终止语句后的所有代码
+      if (terminatorIndex !== -1 && terminatorIndex < statements.length - 1) {
+        statements.splice(terminatorIndex + 1);
+      }
     }
   });
 
-  // 生成清理后的代码
-  result.cleanedCode = generate(ast).code;
+  return generate(ast).code
 }
-
-function getCodeFromNode(node: t.Statement): string {
-  try {
-    return generate(node).code;
-  } catch {
-    return node.type;
-  }
-}
-
-// 完整的控制流分析
-function analyzeControlFlow(statements: t.Statement[]): t.Statement[] {
-  const unreachableStmts: t.Statement[] = [];
-  
-  // 分析每个语句的可达性
-  for (let i = 0; i < statements.length; i++) {
-    const stmt = statements[i];
-    
-    // 检查前面是否有无条件终止语句
-    const hasUnconditionalTerminator = checkUnconditionalTerminatorBefore(statements, i);
-    
-    if (hasUnconditionalTerminator) {
-      unreachableStmts.push(stmt);
-      continue;
-    }
-    
-    // 递归分析嵌套语句中的不可达代码
-    const nestedUnreachable = analyzeNestedStatements(stmt);
-    unreachableStmts.push(...nestedUnreachable);
-  }
-  
-  return unreachableStmts;
-}
-
-// 检查前面是否有无条件终止语句
-function checkUnconditionalTerminatorBefore(statements: t.Statement[], currentIndex: number): boolean {
-  for (let i = 0; i < currentIndex; i++) {
-    const stmt = statements[i];
-    
-    // 简单终止语句
-    if (t.isReturnStatement(stmt) || t.isThrowStatement(stmt)) {
-      return true;
-    }
-    
-    // 检查if语句是否无条件终止
-    if (t.isIfStatement(stmt)) {
-      const hasUnconditionalTermination = checkIfStatementTermination(stmt);
-      if (hasUnconditionalTermination) {
-        return true;
-      }
-    }
-  }
-  
-  return false;
-}
-
-// 检查if语句是否无条件终止所有路径
-function checkIfStatementTermination(ifStmt: t.IfStatement): boolean {
-  // 检查条件是否是字面量true
-  const isAlwaysTrue = t.isBooleanLiteral(ifStmt.test) && ifStmt.test.value === true;
-  
-  if (isAlwaysTrue) {
-    // if (true) { ... } - 检查then分支是否终止
-    return hasTerminatingStatement(ifStmt.consequent);
-  }
-  
-  // 检查if-else是否两个分支都终止
-  if (ifStmt.alternate) {
-    const thenTerminates = hasTerminatingStatement(ifStmt.consequent);
-    const elseTerminates = hasTerminatingStatement(ifStmt.alternate);
-    return thenTerminates && elseTerminates;
-  }
-  
-  return false;
-}
-
-// 检查语句或块是否包含终止语句
-function hasTerminatingStatement(stmt: t.Statement): boolean {
-  if (t.isReturnStatement(stmt) || t.isThrowStatement(stmt)) {
-    return true;
-  }
-  
-  if (t.isBlockStatement(stmt)) {
-    return stmt.body.some(s => 
-      t.isReturnStatement(s) || 
-      t.isThrowStatement(s) ||
-      (t.isIfStatement(s) && checkIfStatementTermination(s))
-    );
-  }
-  
-  return false;
-}
-
-// 分析嵌套语句中的不可达代码
-function analyzeNestedStatements(stmt: t.Statement): t.Statement[] {
-  const unreachable: t.Statement[] = [];
-  
-  if (t.isBlockStatement(stmt)) {
-    unreachable.push(...analyzeControlFlow(stmt.body));
-  } else if (t.isIfStatement(stmt)) {
-    // 分析then分支
-    if (t.isBlockStatement(stmt.consequent)) {
-      unreachable.push(...analyzeControlFlow(stmt.consequent.body));
-    }
-    
-    // 分析else分支
-    if (stmt.alternate) {
-      if (t.isBlockStatement(stmt.alternate)) {
-        unreachable.push(...analyzeControlFlow(stmt.alternate.body));
-      } else {
-        unreachable.push(...analyzeNestedStatements(stmt.alternate));
-      }
-    }
-  }
-  
-  return unreachable;
-}
-
-// 从块语句中移除语句
-function removeStatementsFromBlock(block: t.BlockStatement, toRemove: t.Statement[]) {
-  const removeSet = new Set(toRemove);
-  block.body = block.body.filter(stmt => !removeSet.has(stmt));
-  
-  // 递归处理嵌套块中的移除
-  for (const stmt of block.body) {
-    if (t.isBlockStatement(stmt)) {
-      removeStatementsFromBlock(stmt, toRemove);
-    } else if (t.isIfStatement(stmt)) {
-      if (t.isBlockStatement(stmt.consequent)) {
-        removeStatementsFromBlock(stmt.consequent, toRemove);
-      }
-      if (stmt.alternate && t.isBlockStatement(stmt.alternate)) {
-        removeStatementsFromBlock(stmt.alternate, toRemove);
-      }
-    }
-  }
-}
-
-// 从程序中移除语句
-function removeStatementsFromProgram(program: t.Program, toRemove: t.Statement[]) {
-  const removeSet = new Set(toRemove);
-  program.body = program.body.filter(stmt => !removeSet.has(stmt));
-}
-
-// 注释掉未使用的CFG相关函数
-// function createCFG(): ControlFlowGraph { ... }
-// function addEdge(cfg: ControlFlowGraph, fromId: number, toId: number) { ... }
-// function buildCFGFromStatements(statements: t.Statement[]): ControlFlowGraph { ... }
-// function processStatement(...) { ... }
-// function processBlockStatement(...) { ... }
-// function processIfStatement(...) { ... }
-// function processTerminatorStatement(...) { ... }
-// function createNode(...) { ... }
