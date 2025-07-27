@@ -1,4 +1,5 @@
 import { readFile, writeFile, access, constants, mkdir } from "fs/promises";
+import { _isWindows } from "@/constants";
 import path from "path";
 export const readFileAsync = async (filePath: string): Promise<string> => {
   validateFilePath(filePath);
@@ -39,7 +40,9 @@ const validateFilePath = (filePath: string): void => {
   }
 
   // 3. 非法字符检查
-  const invalidChars = /[<>:"|?*\x00-\x1f]/;
+  const invalidChars = _isWindows
+    ? /[<>"|?*\x00-\x1f]/ // Windows允许反斜杠和冒号(用于驱动器)
+    : /[<>:"|?*\x00-\x1f]/; // Unix系统保持原有限制
   if (invalidChars.test(filePath)) {
     throw new Error("Invalid characters in file path");
   }

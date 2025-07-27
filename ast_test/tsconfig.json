@@ -18,7 +18,8 @@
     "paths": {
       "@/*": ["./*"],
       "@utils/*": ["./utils/*"],
-      "@handlers/*": ["./handlers/*"]
+      "@handlers/*": ["./handlers/*"],
+      "@constants/*": ["./constants/*"]
     }
   },
   "include": [
