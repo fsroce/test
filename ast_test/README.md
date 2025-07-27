@@ -15,6 +15,11 @@
    - 检测未使用的函数参数
    - 自动清理未使用的代码
 
+3. **跨平台文件路径支持**
+   - Windows 路径支持（反斜杠和盘符）
+   - Unix/Linux 路径支持
+   - 路径安全验证和规范化
+
 ## 使用方法
 
 ```bash
@@ -42,6 +47,7 @@ ast_test/
 │   │   ├── dead-code-handler.ts    # 死代码处理
 │   │   ├── unused-var-handler.ts   # 未使用变量处理
 │   │   └── file-processor.ts       # 文件处理工具
+│   ├── constants/    # 常量定义
 │   ├── tests/        # 测试文件
 │   └── utils/        # 工具函数
 └── package.json
