@@ -1,10 +1,9 @@
-import traverse, { NodePath } from "@babel/traverse";
+import traverse from "@babel/traverse";
 import generate from "@babel/generator";
 import * as t from "@babel/types";
-
 import { parseCode } from "@utils/index";
 
-interface UnusedVarResult {
+interface IterativeCleanResult {
   unusedVariables: Array<{
     name: string;
     line: number;
@@ -16,135 +15,144 @@ interface UnusedVarResult {
     column: number;
   }>;
   cleanedCode: string;
+  iterations: number;
 }
 
-// 导出简化版本，只返回清理后的代码
-export function removeUnusedVariable(code: string): string {
-  const result = removeUnusedVar(code);
-  return result.cleanedCode;
-}
-
-function removeUnusedVar(code: string): UnusedVarResult {
-  const ast = parseCode(code);
-  const unusedVariables: Array<{ name: string; line: number; column: number }> = [];
-  const unusedFunctions: Array<{ name: string; line: number; column: number }> = [];
-  
-  // 验证输入
+export default function removeUnusedVariableAndFunction(code: string): IterativeCleanResult {
   if (!code.trim()) {
     return {
       unusedVariables: [],
       unusedFunctions: [],
-      cleanedCode: code
+      cleanedCode: code,
+      iterations: 0,
     };
   }
 
+  // 第一步：移除未使用的函数
+  const funcResult = removeUnusedFunctions(code);
+  
+  // 第二步：移除未使用的变量
+  const varResult = removeUnusedVariables(funcResult.cleanedCode);
+
+  return {
+    unusedVariables: varResult.unusedVariables,
+    unusedFunctions: funcResult.unusedFunctions,
+    cleanedCode: varResult.cleanedCode,
+    iterations: 1,
+  };
+}
+
+function removeUnusedFunctions(code: string): {
+  unusedFunctions: Array<{ name: string; line: number; column: number }>;
+  cleanedCode: string;
+} {
+  const ast = parseCode(code);
+  const unusedFunctions: Array<{ name: string; line: number; column: number }> = [];
+
+  traverse(ast, {
+    FunctionDeclaration(path) {
+      if (!path.node.id || !t.isIdentifier(path.node.id)) {
+        return;
+      }
+
+      const funcName = path.node.id.name;
+      const binding = path.scope.getBinding(funcName);
+
+      if (!binding || binding.referenced) {
+        return;
+      }
+
+      // 记录未使用的函数
+      if (path.node.id.loc) {
+        unusedFunctions.push({
+          name: funcName,
+          line: path.node.id.loc.start.line,
+          column: path.node.id.loc.start.column,
+        });
+      }
+
+      // 删除整个函数声明
+      path.remove();
+    },
+
+    VariableDeclarator(path) {
+      if (!t.isIdentifier(path.node.id)) {
+        return;
+      }
+
+      // 只处理函数表达式和箭头函数
+      if (!t.isFunctionExpression(path.node.init) && !t.isArrowFunctionExpression(path.node.init)) {
+        return;
+      }
+
+      const funcName = path.node.id.name;
+      const binding = path.scope.getBinding(funcName);
+
+      if (!binding || binding.referenced) {
+        return;
+      }
+
+      // 记录未使用的函数
+      if (path.node.id.loc) {
+        unusedFunctions.push({
+          name: funcName,
+          line: path.node.id.loc.start.line,
+          column: path.node.id.loc.start.column,
+        });
+      }
+
+      // 删除函数变量
+      path.remove();
+    },
+  });
+
+  return {
+    unusedFunctions,
+    cleanedCode: generate(ast).code,
+  };
+}
+
+function removeUnusedVariables(code: string): {
+  unusedVariables: Array<{ name: string; line: number; column: number }>;
+  cleanedCode: string;
+} {
+  const ast = parseCode(code);
+  const unusedVariables: Array<{ name: string; line: number; column: number }> = [];
+
   traverse(ast, {
     VariableDeclarator(path) {
-      // 检查变量是否被使用
-      if (t.isIdentifier(path.node.id)) {
-        const varName = path.node.id.name;
-        const binding = path.scope.getBinding(varName);
-        
-        // 检查 binding 是否存在且 referenced 为 0
-        if (binding && binding.referenced === false) {
-          // 判断是函数还是普通变量
-          const isFunction = 
-          t.isFunctionExpression(path.node.init) ||
-          t.isArrowFunctionExpression(path.node.init);
-          
-          // 记录未使用的变量或函数
-          if (path.node.id.loc) {
-            const unusedItem = {
-              name: varName,
-              line: path.node.id.loc.start.line,
-              column: path.node.id.loc.start.column
-            };
-            
-            if (isFunction) {
-              unusedFunctions.push(unusedItem);
-            } else {
-              unusedVariables.push(unusedItem);
-            }
-          }
-          
-          // 移除变量声明
-          if (path.parent && t.isVariableDeclaration(path.parent)) {
-            if (path.parent.declarations.length === 1) {
-              // 整个声明语句只有这一个变量，删除整个语句
-              path.parentPath?.remove();
-            } else {
-              // 只删除这个变量声明
-              path.remove();
-            }
-          }
-        }
+      if (!t.isIdentifier(path.node.id)) {
+        return;
       }
-    },
-    
-    // 检查未使用的函数声明
-    FunctionDeclaration(path) {
-      if (path.node.id && t.isIdentifier(path.node.id)) {
-        const funcName = path.node.id.name;
-        const binding = path.scope.getBinding(funcName);
-        
-        if (binding && binding.referenced === false) {
-          // 记录未使用的函数
-          if (path.node.id.loc) {
-            unusedFunctions.push({
-              name: funcName,
-              line: path.node.id.loc.start.line,
-              column: path.node.id.loc.start.column
-            });
-          }
-          
-          // 删除整个函数声明
-          path.remove();
-        } else {
-          // 检查函数参数
-          checkUnusedFunctionParams(path, unusedVariables);
-        }
+
+      // 跳过函数表达式和箭头函数（已在函数清理中处理）
+      if (t.isFunctionExpression(path.node.init) || t.isArrowFunctionExpression(path.node.init)) {
+        return;
       }
+
+      const varName = path.node.id.name;
+      const binding = path.scope.getBinding(varName);
+
+      if (!binding || binding.referenced) {
+        return;
+      }
+
+      // 记录未使用的变量
+      if (path.node.id.loc) {
+        unusedVariables.push({
+          name: varName,
+          line: path.node.id.loc.start.line,
+          column: path.node.id.loc.start.column,
+        });
+      }
+
+      // 删除变量
+      path.remove();
     },
-    
-    // 检查函数表达式和箭头函数的参数
-    FunctionExpression(path) {
-      checkUnusedFunctionParams(path, unusedVariables);
-    },
-    
-    ArrowFunctionExpression(path) {
-      checkUnusedFunctionParams(path, unusedVariables);
-    }
   });
 
   return {
     unusedVariables,
-    unusedFunctions,
-    cleanedCode: generate(ast).code
+    cleanedCode: generate(ast).code,
   };
-}
-
-function checkUnusedFunctionParams(
-  path: NodePath<t.Function>, 
-  unusedVariables: Array<{ name: string; line: number; column: number }>
-) {
-  const params = path.node.params;
-  
-  for (const param of params) {
-    if (t.isIdentifier(param)) {
-      const paramName = param.name;
-      const binding = path.scope.getBinding(paramName);
-      
-      if (binding && binding.referenced === false) {
-        // 函数参数未使用，但不删除参数以保持函数签名
-        // 只记录到未使用变量列表中供参考
-        if (param.loc) {
-          unusedVariables.push({
-            name: paramName,
-            line: param.loc.start.line,
-            column: param.loc.start.column
-          });
-        }
-      }
-    }
-  }
 }

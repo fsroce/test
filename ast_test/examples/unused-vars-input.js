@@ -17,12 +17,21 @@ function testFunction() {
   return "done";
 }
 
+const usedArrowFunc = () => {}
+usedArrowFunc();
+const unusedArrowFunc = () => {}
+
+const usedFunc = function() {}
+usedFunc();
+const unusedFunc = function() {}
+
+
 // 未使用的顶级变量
 const globalUnused = "global unused";
 let anotherUnused = [];
 
 // 被使用的变量
-const globalUsed = "I am used";
+const globalUsed = "I am unused";
 
 function anotherFunction() {
   const localVar = "local";
@@ -31,4 +40,3 @@ function anotherFunction() {
 }
 
 testFunction();
-anotherFunction();
