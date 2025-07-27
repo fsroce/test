@@ -2,4 +2,5 @@
 import '@utils/initSys'
 
 // test 引入测试代码
-import './tests/dead-code-handler-test'
+// import './tests/dead-code-handler-test'
+import './tests/unused-var-handler-test'
