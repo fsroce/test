@@ -1,0 +1,44 @@
+{
+  "name": "image-to-canvas-generator",
+  "version": "1.0.0",
+  "description": "将图片转换为TypeScript Canvas绘制代码的Node.js工具",
+  "main": "dist/generator.js",
+  "bin": {
+    "img2canvas": "./dist/generator.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/generator.js",
+    "dev": "ts-node generator.ts",
+    "clean": "rimraf dist output",
+    "test": "node dist/generator.js ./test-images/sample.png -w 50",
+    "global": "npm install -g ."
+  },
+  "keywords": [
+    "canvas",
+    "typescript",
+    "image",
+    "converter",
+    "pixel",
+    "drawing"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "rimraf": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "package.json"
+  ]
+}
