@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Chart Performance Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 15px;
+      cursor: pointer;
+    }
+    #performance {
+      background: #f0f0f0;
+      padding: 10px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    #chart-container {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 800px;
+      height: 400px;
+      position: relative;
+      background: white;
+      overflow: hidden;
+    }
+    .data-point {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #ff6b6b;
+      border-radius: 50%;
+      transition: all 0.1s ease;
+    }
+    .line-segment {
+      position: absolute;
+      height: 2px;
+      background: #4ecdc4;
+      transform-origin: left center;
+    }
+    .bar {
+      position: absolute;
+      background: linear-gradient(to top, #ff6b6b, #4ecdc4);
+      bottom: 0;
+      width: 8px;
+      transition: height 0.3s ease;
+    }
+    .axis {
+      position: absolute;
+      background: #333;
+    }
+    .axis-x {
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1px;
+    }
+    .axis-y {
+      left: 0;
+      bottom: 0;
+      width: 1px;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>DOM Chart Performance Test</h1>
+
+  <div class="controls">
+    <button onclick="createLineChart(100)">100点折线图</button>
+    <button onclick="createLineChart(500)">500点折线图</button>
+    <button onclick="createLineChart(1000)">1000点折线图</button>
+    <button onclick="createBarChart(50)">50柱状图</button>
+    <button onclick="createBarChart(100)">100柱状图</button>
+    <button onclick="createBarChart(200)">200柱状图</button>
+    <button onclick="startRealTimeChart()">实时数据图</button>
+    <button onclick="stopRealTime()">停止</button>
+    <button onclick="clearChart()">清空</button>
+  </div>
+
+  <div id="performance">
+    <strong>Performance Info:</strong>
+    <div id="stats"></div>
+  </div>
+
+  <div style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-radius: 5px; font-size: 14px;">
+    <h3 style="margin-top: 0;">📊 性能指标说明</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <div>
+        <h4>📈 时间指标</h4>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>总时间</strong>: performance.now() 完整测量</li>
+          <li><strong>创建时间</strong>: DOM元素创建耗时</li>
+          <li><strong>更新时间</strong>: 实时图表单帧更新耗时</li>
+          <li><strong>点击检测</strong>: 事件响应速度</li>
+        </ul>
+      </div>
+      <div>
+        <h4>💾 内存估算</h4>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>数据点</strong>: 每个约200字节</li>
+          <li><strong>线段</strong>: 每个约150字节</li>
+          <li><strong>柱状图</strong>: 每个约150字节</li>
+          <li>包含DOM节点、样式、事件监听器</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top: 15px;">
+      <h4>🎯 性能评级标准</h4>
+      <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <span>🟢 优秀: &lt;0.1ms/元素</span>
+        <span>🟡 良好: 0.1-0.5ms/元素</span>
+        <span>🟠 一般: 0.5-1.0ms/元素</span>
+        <span>🔴 较差: &gt;1.0ms/元素</span>
+      </div>
+    </div>
+    <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 3px;">
+      <strong>💡 DOM优势:</strong> 浏览器原生优化、事件处理、CSS动画、虚拟化滚动<br>
+      <strong>⚠️ DOM劣势:</strong> 大量元素时内存占用高、重排重绘开销大
+    </div>
+  </div>
+
+  <div id="chart-container">
+    <div class="axis axis-x"></div>
+    <div class="axis axis-y"></div>
+  </div>
+
+  <script>
+    const container = document.getElementById('chart-container');
+    const stats = document.getElementById('stats');
+    let realTimeInterval;
+    let realTimeData = [];
+
+    function clearChart() {
+      const startTime = performance.now();
+      // Remove all chart elements except axes
+      const elements = container.querySelectorAll('.data-point, .line-segment, .bar');
+      elements.forEach(el => el.remove());
+      const endTime = performance.now();
+
+      stats.innerHTML = `Cleared in ${(endTime - startTime).toFixed(2)}ms`;
+    }
+
+    function createLineChart(pointCount) {
+      const startTime = performance.now();
+      clearChart();
+
+      const width = 780;
+      const height = 380;
+      const points = [];
+      const elements = [];
+
+      // Generate data points
+      for (let i = 0; i < pointCount; i++) {
+        const x = (i / (pointCount - 1)) * width;
+        const y = height - (Math.random() * 0.7 + 0.1) * height;
+        points.push({ x, y });
+      }
+
+      const createStart = performance.now();
+
+      // Create DOM elements for points
+      points.forEach((point, i) => {
+        // Create data point
+        const pointEl = document.createElement('div');
+        pointEl.className = 'data-point';
+        pointEl.style.left = point.x + 'px';
+        pointEl.style.top = point.y + 'px';
+        container.appendChild(pointEl);
+        elements.push(pointEl);
+
+        // Create line segment to next point
+        if (i < points.length - 1) {
+          const nextPoint = points[i + 1];
+          const lineEl = document.createElement('div');
+          lineEl.className = 'line-segment';
+
+          const dx = nextPoint.x - point.x;
+          const dy = nextPoint.y - point.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+          lineEl.style.left = point.x + 'px';
+          lineEl.style.top = point.y + 'px';
+          lineEl.style.width = length + 'px';
+          lineEl.style.transform = `rotate(${angle}deg)`;
+
+          container.appendChild(lineEl);
+          elements.push(lineEl);
+        }
+      });
+
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+      const createTime = endTime - createStart;
+
+      updateStats('DOM折线图', pointCount, totalTime, createTime, elements.length * 200);
+    }
+
+    function createBarChart(barCount) {
+      const startTime = performance.now();
+      clearChart();
+
+      const width = 780;
+      const height = 380;
+      const barWidth = 8; // Match Canvas bar width
+      const elements = [];
+
+      const createStart = performance.now();
+
+      for (let i = 0; i < barCount; i++) {
+        const barHeight = (Math.random() * 0.8 + 0.1) * height;
+        const x = i * (barWidth + 2) + 1; // Match Canvas spacing
+
+        const barEl = document.createElement('div');
+        barEl.className = 'bar';
+        barEl.style.left = x + 'px';
+        barEl.style.width = barWidth + 'px';
+        barEl.style.height = barHeight + 'px';
+        barEl.title = `Bar ${i}: ${Math.round(barHeight)}`;
+
+        container.appendChild(barEl);
+        elements.push(barEl);
+      }
+
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+      const createTime = endTime - createStart;
+
+      updateStats('DOM柱状图', barCount, totalTime, createTime, elements.length * 150);
+    }
+
+    function startRealTimeChart() {
+      clearChart();
+      realTimeData = [];
+      let frameCount = 0;
+      const maxPoints = 100;
+
+      const startTime = performance.now();
+
+      realTimeInterval = setInterval(() => {
+        const updateStart = performance.now();
+
+        // Add new data point
+        const newValue = Math.random() * 300 + 50;
+        realTimeData.push(newValue);
+
+        if (realTimeData.length > maxPoints) {
+          realTimeData.shift();
+          // Remove oldest DOM element
+          const oldestPoint = container.querySelector('.data-point');
+          const oldestLine = container.querySelector('.line-segment');
+          if (oldestPoint) oldestPoint.remove();
+          if (oldestLine) oldestLine.remove();
+        }
+
+        // Create new point
+        const x = (realTimeData.length - 1) * (780 / maxPoints);
+        const y = 380 - newValue;
+
+        const pointEl = document.createElement('div');
+        pointEl.className = 'data-point';
+        pointEl.style.left = x + 'px';
+        pointEl.style.top = y + 'px';
+        pointEl.style.background = `hsl(${frameCount * 2 % 360}, 70%, 60%)`;
+        container.appendChild(pointEl);
+
+        // Create line to previous point if exists
+        if (realTimeData.length > 1) {
+          const prevX = (realTimeData.length - 2) * (780 / maxPoints);
+          const prevY = 380 - realTimeData[realTimeData.length - 2];
+
+          const lineEl = document.createElement('div');
+          lineEl.className = 'line-segment';
+
+          const dx = x - prevX;
+          const dy = y - prevY;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+          lineEl.style.left = prevX + 'px';
+          lineEl.style.top = prevY + 'px';
+          lineEl.style.width = length + 'px';
+          lineEl.style.background = `hsl(${frameCount * 2 % 360}, 70%, 60%)`;
+          lineEl.style.transform = `rotate(${angle}deg)`;
+
+          container.appendChild(lineEl);
+        }
+
+        // Update all existing points and lines positions (sliding effect)
+        const points = container.querySelectorAll('.data-point');
+        const lines = container.querySelectorAll('.line-segment');
+
+        points.forEach((point, i) => {
+          if (i < realTimeData.length) {
+            const newX = i * (780 / maxPoints);
+            point.style.left = newX + 'px';
+            point.style.top = (380 - realTimeData[i]) + 'px';
+          }
+        });
+
+        // Redraw all lines
+        lines.forEach(line => line.remove());
+        for (let i = 1; i < realTimeData.length; i++) {
+          const x1 = (i - 1) * (780 / maxPoints);
+          const y1 = 380 - realTimeData[i - 1];
+          const x2 = i * (780 / maxPoints);
+          const y2 = 380 - realTimeData[i];
+
+          const lineEl = document.createElement('div');
+          lineEl.className = 'line-segment';
+
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+          lineEl.style.left = x1 + 'px';
+          lineEl.style.top = y1 + 'px';
+          lineEl.style.width = length + 'px';
+          lineEl.style.background = `hsl(${frameCount * 2 % 360}, 70%, 60%)`;
+          lineEl.style.transform = `rotate(${angle}deg)`;
+
+          container.appendChild(lineEl);
+        }
+
+        const updateEnd = performance.now();
+        const updateTime = updateEnd - updateStart;
+
+        frameCount++;
+        if (frameCount % 10 === 0) {
+          stats.innerHTML = `实时图表更新 - 第${frameCount}帧 (更新: ${updateTime.toFixed(2)}ms, 元素数: ${realTimeData.length})`;
+        }
+      }, 50); // 20 FPS
+    }
+
+    function stopRealTime() {
+      if (realTimeInterval) {
+        clearInterval(realTimeInterval);
+        realTimeInterval = null;
+      }
+    }
+
+    function updateStats(type, count, totalTime, createTime, memoryUsage) {
+      stats.innerHTML = `
+        <div>图表类型: ${type}</div>
+        <div>数据点数: ${count}</div>
+        <div>总时间: ${totalTime.toFixed(2)}ms</div>
+        <div>创建时间: ${createTime.toFixed(2)}ms</div>
+        <div>预估内存: ${(memoryUsage / 1024).toFixed(2)}KB</div>
+        <div>性能评级: ${getPerformanceRating(count, totalTime)}</div>
+      `;
+    }
+
+    function getPerformanceRating(count, time) {
+      const ratio = time / count;
+      if (ratio < 0.1) return '🟢 优秀';
+      if (ratio < 0.5) return '🟡 良好';
+      if (ratio < 1.0) return '🟠 一般';
+      return '🔴 较差';
+    }
+
+    // Add click events to chart elements
+    container.addEventListener('click', function(event) {
+      if (event.target.classList.contains('data-point') || event.target.classList.contains('bar')) {
+        const startTime = performance.now();
+        const endTime = performance.now();
+        console.log(`Clicked chart element`);
+        stats.innerHTML += `<div>点击检测: ${(endTime - startTime).toFixed(2)}ms</div>`;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas Chart Performance Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    button {
+      margin: 5px;
+      padding: 10px 15px;
+      cursor: pointer;
+    }
+    #performance {
+      background: #f0f0f0;
+      padding: 10px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    #chart-container {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 800px;
+      height: 400px;
+    }
+    #canvas {
+      border: none;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Canvas Chart Performance Test</h1>
+
+  <div class="controls">
+    <button onclick="createLineChart(100)">100点折线图</button>
+    <button onclick="createLineChart(500)">500点折线图</button>
+    <button onclick="createLineChart(1000)">1000点折线图</button>
+    <button onclick="createBarChart(50)">50柱状图</button>
+    <button onclick="createBarChart(100)">100柱状图</button>
+    <button onclick="createBarChart(200)">200柱状图</button>
+    <button onclick="startRealTimeChart()">实时数据图</button>
+    <button onclick="stopRealTime()">停止</button>
+    <button onclick="clearChart()">清空</button>
+  </div>
+
+  <div id="performance">
+    <strong>Performance Info:</strong>
+    <div id="stats"></div>
+  </div>
+
+  <div style="background: #f9f9f9; padding: 15px; margin: 20px 0; border-radius: 5px; font-size: 14px;">
+    <h3 style="margin-top: 0;">📊 性能指标说明</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <div>
+        <h4>📈 时间指标</h4>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>总时间</strong>: performance.now() 完整测量</li>
+          <li><strong>创建时间</strong>: Canvas绘制命令耗时</li>
+          <li><strong>更新时间</strong>: 实时图表单帧重绘耗时</li>
+          <li><strong>点击检测</strong>: 坐标计算响应速度</li>
+        </ul>
+      </div>
+      <div>
+        <h4>💾 内存估算</h4>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>数据点</strong>: 每个约50字节</li>
+          <li><strong>线段</strong>: 每个约30字节</li>
+          <li><strong>柱状图</strong>: 每个约30字节</li>
+          <li>主要存储坐标和颜色数据</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top: 15px;">
+      <h4>🎯 性能评级标准</h4>
+      <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <span>🟢 优秀: &lt;0.05ms/元素</span>
+        <span>🟡 良好: 0.05-0.2ms/元素</span>
+        <span>🟠 一般: 0.2-0.5ms/元素</span>
+        <span>🔴 较差: &gt;0.5ms/元素</span>
+      </div>
+    </div>
+    <div style="margin-top: 10px; padding: 10px; background: #e8f5e8; border-radius: 3px;">
+      <strong>💡 Canvas优势:</strong> 高效绘制、内存固定、适合动画、无DOM开销<br>
+      <strong>⚠️ Canvas劣势:</strong> 手动事件处理、无浏览器优化、大画布内存占用高
+    </div>
+  </div>
+
+  <div id="chart-container">
+    <canvas id="canvas" width="780" height="380"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const stats = document.getElementById('stats');
+    let realTimeInterval;
+    let realTimeData = [];
+    let chartData = [];
+
+    function clearChart() {
+      const startTime = performance.now();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      chartData = [];
+      drawAxes();
+      const endTime = performance.now();
+
+      stats.innerHTML = `Cleared in ${(endTime - startTime).toFixed(2)}ms`;
+    }
+
+    function drawAxes() {
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      // X axis
+      ctx.moveTo(0, canvas.height - 1);
+      ctx.lineTo(canvas.width, canvas.height - 1);
+      // Y axis
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, canvas.height);
+      ctx.stroke();
+    }
+
+    function createLineChart(pointCount) {
+      const startTime = performance.now();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawAxes();
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const points = [];
+      chartData = [];
+
+      // Generate data points
+      for (let i = 0; i < pointCount; i++) {
+        const x = (i / (pointCount - 1)) * width;
+        const y = height - (Math.random() * 0.7 + 0.1) * height;
+        points.push({ x, y });
+        chartData.push({ x, y, id: i });
+      }
+
+      const createStart = performance.now();
+
+      // Draw line
+      ctx.strokeStyle = '#4ecdc4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.stroke();
+
+      // Draw points (match DOM 4px size)
+      ctx.fillStyle = '#ff6b6b';
+      points.forEach((point, i) => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Add point number for small datasets
+        if (pointCount <= 100) {
+          ctx.fillStyle = 'white';
+          ctx.font = '8px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(i.toString(), point.x, point.y + 2);
+          ctx.fillStyle = '#ff6b6b';
+        }
+      });
+
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+      const createTime = endTime - createStart;
+
+      updateStats('Canvas折线图', pointCount, totalTime, createTime, pointCount * 50);
+    }
+
+    function createBarChart(barCount) {
+      const startTime = performance.now();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawAxes();
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const barWidth = 8; // Match DOM bar width
+      chartData = [];
+
+      const createStart = performance.now();
+
+      for (let i = 0; i < barCount; i++) {
+        const barHeight = (Math.random() * 0.8 + 0.1) * height;
+        const x = i * (barWidth + 2) + 1; // Match DOM spacing
+        const y = height - barHeight;
+
+        // Store data for click detection
+        chartData.push({
+          x: x,
+          y: y,
+          width: barWidth,
+          height: barHeight,
+          id: i
+        });
+
+        // Create gradient
+        const gradient = ctx.createLinearGradient(0, y, 0, height);
+        gradient.addColorStop(0, '#4ecdc4');
+        gradient.addColorStop(1, '#ff6b6b');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, barWidth, barHeight);
+
+        // Add bar number for small datasets
+        if (barCount <= 50) {
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(i.toString(), x + barWidth/2, y + barHeight/2);
+        }
+      }
+
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+      const createTime = endTime - createStart;
+
+      updateStats('Canvas柱状图', barCount, totalTime, createTime, barCount * 30);
+    }
+
+    function startRealTimeChart() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawAxes();
+      realTimeData = [];
+      let frameCount = 0;
+      const maxPoints = 100;
+
+      realTimeInterval = setInterval(() => {
+        const updateStart = performance.now();
+
+        // Add new data point
+        const newValue = Math.random() * 300 + 50;
+        realTimeData.push(newValue);
+
+        if (realTimeData.length > maxPoints) {
+          realTimeData.shift();
+        }
+
+        // Clear and redraw everything
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawAxes();
+
+        // Draw line
+        if (realTimeData.length > 1) {
+          ctx.strokeStyle = `hsl(${frameCount % 360}, 70%, 60%)`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+
+          const pointSpacing = canvas.width / maxPoints;
+          realTimeData.forEach((value, i) => {
+            const x = i * pointSpacing;
+            const y = canvas.height - value;
+
+            if (i === 0) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          });
+          ctx.stroke();
+
+          // Draw points
+          ctx.fillStyle = `hsl(${frameCount % 360}, 70%, 60%)`;
+          realTimeData.forEach((value, i) => {
+            const x = i * pointSpacing;
+            const y = canvas.height - value;
+
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+
+        const updateEnd = performance.now();
+        const updateTime = updateEnd - updateStart;
+
+        frameCount++;
+        if (frameCount % 10 === 0) {
+          stats.innerHTML = `实时图表更新 - 第${frameCount}帧 (更新: ${updateTime.toFixed(2)}ms, 数据点: ${realTimeData.length})`;
+        }
+      }, 50); // 20 FPS
+    }
+
+    function stopRealTime() {
+      if (realTimeInterval) {
+        clearInterval(realTimeInterval);
+        realTimeInterval = null;
+      }
+    }
+
+    function updateStats(type, count, totalTime, createTime, memoryUsage) {
+      stats.innerHTML = `
+        <div>图表类型: ${type}</div>
+        <div>数据点数: ${count}</div>
+        <div>总时间: ${totalTime.toFixed(2)}ms</div>
+        <div>创建时间: ${createTime.toFixed(2)}ms</div>
+        <div>预估内存: ${(memoryUsage / 1024).toFixed(2)}KB</div>
+        <div>性能评级: ${getPerformanceRating(count, totalTime)}</div>
+      `;
+    }
+
+    function getPerformanceRating(count, time) {
+      const ratio = time / count;
+      if (ratio < 0.05) return '🟢 优秀';
+      if (ratio < 0.2) return '🟡 良好';
+      if (ratio < 0.5) return '🟠 一般';
+      return '🔴 较差';
+    }
+
+    // Click detection for canvas
+    canvas.addEventListener('click', function(event) {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const clickY = event.clientY - rect.top;
+
+      const startTime = performance.now();
+
+      let clickedItem = null;
+
+      // Check if clicked on chart data
+      for (let i = 0; i < chartData.length; i++) {
+        const item = chartData[i];
+
+        if (item.width && item.height) {
+          // Bar chart detection
+          if (clickX >= item.x && clickX <= item.x + item.width &&
+              clickY >= item.y && clickY <= item.y + item.height) {
+            clickedItem = item;
+            break;
+          }
+        } else {
+          // Line chart point detection (within 10px radius)
+          const distance = Math.sqrt(
+            Math.pow(clickX - item.x, 2) + Math.pow(clickY - item.y, 2)
+          );
+          if (distance <= 10) {
+            clickedItem = item;
+            break;
+          }
+        }
+      }
+
+      const endTime = performance.now();
+      const detectTime = endTime - startTime;
+
+      if (clickedItem) {
+        console.log(`Clicked Canvas Chart Item #${clickedItem.id}`);
+        stats.innerHTML += `<div>点击项目 #${clickedItem.id} (检测: ${detectTime.toFixed(2)}ms)</div>`;
+      } else {
+        console.log(`Clicked empty area`);
+        stats.innerHTML += `<div>点击空白区域 (检测: ${detectTime.toFixed(2)}ms)</div>`;
+      }
+    });
+
+    // Initialize with axes
+    drawAxes();
+  </script>
+</body>
+</html>
