@@ -2,7 +2,7 @@
 // 自动生成自: ./img/grapefruit-slice.jpg
 // 图片尺寸: 332x332
 // 总像素数: 110224
-// 生成时间: 9/28/2025, 5:38:48 AM
+// 生成时间: 9/28/2025, 6:04:37 AM
 
 function drawGrapefruit(canvasId) {
     const canvas = document.getElementById(canvasId);

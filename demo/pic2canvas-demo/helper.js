@@ -47,17 +47,37 @@ function drawGrapefruit(c){const n=document.getElementById(c);if(!n)return;const
 document.addEventListener('DOMContentLoaded',()=>{const c=document.querySelector('canvas');c&&(c.width||=400,c.height||=400,c.id||='autoCanvas',drawGrapefruit(c.id))});`;
 
         } else if (encoding === 'unicode') {
-            // Unicode字符编码版本 - 每个字符打包2个字节
+            // Unicode字符编码版本 - 最大密度编码
             let unicodeData = '';
-            for (let i = 0; i < pixelArray.length; i += 2) {
+
+            // 使用0x20-0x7E范围的95个可打印字符，避免控制字符和引号
+            const charset = [];
+            for (let i = 32; i <= 126; i++) {
+                if (i !== 34 && i !== 39 && i !== 92) { // 排除 " ' \ 避免转义
+                    charset.push(i);
+                }
+            }
+            const base = charset.length; // 92个字符
+
+            // 每3个字节打包成4个字符 (3*8 = 24bits, 4*log2(92) ≈ 4*6.5 = 26bits)
+            for (let i = 0; i < pixelArray.length; i += 3) {
                 const byte1 = pixelArray[i] || 0;
                 const byte2 = pixelArray[i + 1] || 0;
-                const packed = (byte1 << 8) | byte2;
-                unicodeData += String.fromCharCode(packed);
+                const byte3 = pixelArray[i + 2] || 0;
+
+                let value = (byte1 << 16) | (byte2 << 8) | byte3;
+
+                // 转换为4个字符
+                let encoded = '';
+                for (let j = 0; j < 4; j++) {
+                    encoded = String.fromCharCode(charset[value % base]) + encoded;
+                    value = Math.floor(value / base);
+                }
+                unicodeData += encoded;
             }
 
             jsCode = `/*${imagePath} ${width}x${height} Unicode编码 ${new Date().toISOString()}*/
-function drawGrapefruit(c){const n=document.getElementById(c);if(!n)return;const t=n.getContext('2d');n.width=${width};n.height=${height};const e=t.createImageData(${width},${height}),r=e.data,u='${unicodeData.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';for(let i=0,p=0;i<u.length;i++){const k=u.charCodeAt(i);r[p++]=(k>>8)&255;if(p<r.length)r[p++]=k&255}t.putImageData(e,0,0)}
+function drawGrapefruit(c){const n=document.getElementById(c);if(!n)return;const t=n.getContext('2d');n.width=${width};n.height=${height};const e=t.createImageData(${width},${height}),r=e.data,u='${unicodeData}',s=[];for(let i=32;i<=126;i++)if(i!==34&&i!==39&&i!==92)s.push(i);for(let i=0,p=0;i<u.length;i+=4){let v=0;for(let j=0;j<4&&i+j<u.length;j++){const idx=s.indexOf(u.charCodeAt(i+j));v=v*${base}+idx}r[p++]=(v>>16)&255;r[p++]=(v>>8)&255;r[p++]=v&255}t.putImageData(e,0,0)}
 document.addEventListener('DOMContentLoaded',()=>{const c=document.querySelector('canvas');c&&(c.width||=400,c.height||=400,c.id||='autoCanvas',drawGrapefruit(c.id))});`;
         } else {
             // 标准版本
