@@ -6,7 +6,7 @@ const fs = require('fs');
 const Jimp = require('jimp');
 const path = require('path');
 
-async function generateCanvasJS(imagePath = 'img/grapefruit-slice.jpg', outputPath = 'canvas.js', compressed = false) {
+async function generateCanvasJS(imagePath = 'img/grapefruit-slice.jpg', outputPath = 'canvas.js', encoding = 'standard') {
     try {
         console.log(`🔍 正在读取图片: ${imagePath}`);
         
@@ -22,26 +22,42 @@ async function generateCanvasJS(imagePath = 'img/grapefruit-slice.jpg', outputPa
         
         console.log(`✅ 图片加载成功，尺寸: ${width}x${height}`);
         console.log(`📊 总像素数: ${width * height}`);
-        console.log(`🔄 开始生成${compressed ? '压缩' : '标准'}JavaScript代码...`);
+        console.log(`🔄 开始生成${encoding}编码JavaScript代码...`);
         
+        // 生成像素数据
+        const pixelArray = [];
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const color = Jimp.intToRGBA(image.getPixelColor(x, y));
+                pixelArray.push(color.r, color.g, color.b, color.a);
+            }
+        }
+
         // 生成JavaScript代码
         let jsCode;
-        
-        if (compressed) {
-            // 压缩版本 - 使用base64编码
-            const pixelArray = [];
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const color = Jimp.intToRGBA(image.getPixelColor(x, y));
-                    pixelArray.push(color.r, color.g, color.b, color.a);
-                }
-            }
+
+        if (encoding === 'base64') {
+            // Base64编码版本
             
             const buffer = Buffer.from(pixelArray);
             const base64Data = buffer.toString('base64');
             
-            jsCode = `/*${imagePath} ${width}x${height} ${new Date().toISOString()}*/
+            jsCode = `/*${imagePath} ${width}x${height} Base64编码 ${new Date().toISOString()}*/
 function drawGrapefruit(c){const n=document.getElementById(c);if(!n)return;const t=n.getContext('2d');n.width=${width};n.height=${height};const e=t.createImageData(${width},${height}),r=e.data,a=atob('${base64Data}');for(let o=0;o<a.length;o++)r[o]=a.charCodeAt(o);t.putImageData(e,0,0)}
+document.addEventListener('DOMContentLoaded',()=>{const c=document.querySelector('canvas');c&&(c.width||=400,c.height||=400,c.id||='autoCanvas',drawGrapefruit(c.id))});`;
+
+        } else if (encoding === 'unicode') {
+            // Unicode字符编码版本 - 每个字符打包2个字节
+            let unicodeData = '';
+            for (let i = 0; i < pixelArray.length; i += 2) {
+                const byte1 = pixelArray[i] || 0;
+                const byte2 = pixelArray[i + 1] || 0;
+                const packed = (byte1 << 8) | byte2;
+                unicodeData += String.fromCharCode(packed);
+            }
+
+            jsCode = `/*${imagePath} ${width}x${height} Unicode编码 ${new Date().toISOString()}*/
+function drawGrapefruit(c){const n=document.getElementById(c);if(!n)return;const t=n.getContext('2d');n.width=${width};n.height=${height};const e=t.createImageData(${width},${height}),r=e.data,u='${unicodeData.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';for(let i=0,p=0;i<u.length;i++){const k=u.charCodeAt(i);r[p++]=(k>>8)&255;if(p<r.length)r[p++]=k&255}t.putImageData(e,0,0)}
 document.addEventListener('DOMContentLoaded',()=>{const c=document.querySelector('canvas');c&&(c.width||=400,c.height||=400,c.id||='autoCanvas',drawGrapefruit(c.id))});`;
         } else {
             // 标准版本
@@ -170,12 +186,16 @@ async function autoGenerate() {
     for (const imagePath of possiblePaths) {
         try {
             // 生成标准版本
-            await generateCanvasJS(imagePath, 'canvas.js', false);
+            await generateCanvasJS(imagePath, 'canvas.js', 'standard');
             console.log(`\n🎉 标准版本: ${imagePath} -> canvas.js`);
-            
-            // 生成压缩版本
-            await generateCanvasJS(imagePath, 'canvas.min.js', true);
-            console.log(`🎉 压缩版本: ${imagePath} -> canvas.min.js`);
+
+            // 生成Base64版本
+            await generateCanvasJS(imagePath, 'canvas.base64.js', 'base64');
+            console.log(`🎉 Base64版本: ${imagePath} -> canvas.base64.js`);
+
+            // 生成Unicode版本
+            await generateCanvasJS(imagePath, 'canvas.unicode.js', 'unicode');
+            console.log(`🎉 Unicode版本: ${imagePath} -> canvas.unicode.js`);
             
             return;
         } catch (error) {
