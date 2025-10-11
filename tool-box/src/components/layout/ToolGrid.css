@@ -1,0 +1,77 @@
+.tool-grid-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.tool-grid-header {
+  text-align: center;
+  color: white;
+  margin-bottom: 40px;
+}
+
+.main-title {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.main-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.tool-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.tool-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tool-card:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.tool-card-title {
+  color: #667eea;
+  margin: 0 0 8px 0;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-card-icon {
+  font-size: 1.5rem;
+}
+
+.tool-card-description {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 2rem;
+  }
+
+  .tool-grid {
+    grid-template-columns: 1fr;
+  }
+}
