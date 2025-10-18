@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>计时器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
+      gap: 30px;
+    }
+
+    .timer-box {
+      width: 700px;
+      height: 550px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transition: background-color 0.1s ease;
+    }
+
+    .timer-display {
+      font-size: 80px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+      user-select: none;
+    }
+
+    .controls {
+      display: flex;
+      gap: 20px;
+    }
+
+    button {
+      padding: 15px 40px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .start-btn {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .start-btn:hover {
+      background: #45a049;
+    }
+
+    .stop-btn {
+      background: #f44336;
+      color: white;
+    }
+
+    .stop-btn:hover {
+      background: #da190b;
+    }
+
+    .reset-btn {
+      background: #2196F3;
+      color: white;
+    }
+
+    .reset-btn:hover {
+      background: #0b7dda;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="timer-box" id="timerBox">
+    <div class="timer-display" id="timerDisplay">0</div>
+  </div>
+
+  <div class="controls">
+    <button class="start-btn" id="startBtn">开始</button>
+    <button class="stop-btn" id="stopBtn" disabled>停止</button>
+    <button class="reset-btn" id="resetBtn">清零</button>
+  </div>
+
+  <script>
+    // 获取元素
+    const timerBox = document.getElementById('timerBox');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // 状态变量
+    let counter = 0;
+    let colorInterval = null;
+    let timerInterval = null;
+    let isRunning = false;
+
+    // 颜色数组
+    const colors = [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+      '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
+      '#F8B739', '#52B788', '#E63946', '#A8DADC'
+    ];
+
+    let currentColorIndex = 0;
+
+    // 切换背景颜色
+    function changeColor() {
+      currentColorIndex = (currentColorIndex + 1) % colors.length;
+      timerBox.style.backgroundColor = colors[currentColorIndex];
+    }
+
+    // 更新计时器显示
+    function updateTimer() {
+      counter++;
+      timerDisplay.textContent = counter;
+    }
+
+    // 开始计时
+    function startTimer() {
+      if (isRunning) return;
+
+      isRunning = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+
+      // 每100ms切换背景色
+      colorInterval = setInterval(changeColor, 100);
+
+      // 每1000ms更新计时器
+      timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    // 停止计时
+    function stopTimer() {
+      if (!isRunning) return;
+
+      isRunning = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+
+      clearInterval(colorInterval);
+      clearInterval(timerInterval);
+    }
+
+    // 清零
+    function resetTimer() {
+      stopTimer();
+      counter = 0;
+      timerDisplay.textContent = '0';
+      currentColorIndex = 0;
+      timerBox.style.backgroundColor = colors[0];
+    }
+
+    // 绑定事件
+    startBtn.addEventListener('click', startTimer);
+    stopBtn.addEventListener('click', stopTimer);
+    resetBtn.addEventListener('click', resetTimer);
+
+    // 初始化颜色
+    timerBox.style.backgroundColor = colors[0];
+  </script>
+</body>
+</html>

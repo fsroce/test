@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    .w-320 {
+      width: 320px;
+    }
+    .h-150 {
+      height: 150px;
+    }
+    .bg-bfa {
+      background-color: #bfa;
+    }
+    .flex {
+      display: flex; 
+      justify-content: center;
+      align-items: center;
+    }
+    .w-screen {
+      width: 100vw;
+    }
+    .h-screen {
+      height: 100vh;
+    }
+    .circle {
+      border-radius: 50%;
+    }
+    .w-50 {
+      width: 50px;
+    }
+    .h-50 {
+      height: 50px;
+    }
+    .bg-blue {
+      background-color: #00f;
+    }
+    .text-white {
+      color: #fff;
+    }
+    .bg-red {
+      background-color: #f00;
+    }
+    .bottom {
+      position: absolute;
+      bottom: 150px;
+    }
+  </style>
+</head>
+<body class="flex w-screen h-screen">
+  <div class="flex w-320 h-150 bg-bfa">
+    <div class="flex w-50 h-50 circle bg-blue">
+      <span id="count" class="text-white">
+        0
+      </span>
+    </div>
+  </div>
+  <div class="w-50 h-50 bg-red bottom" id="btn"></div>
+</body>
+<script>
+  let isRecording = false;
+  const count = document.getElementById('count');
+  const btn = document.getElementById('btn');
+  btn.addEventListener('click', () => {
+    isRecording = !isRecording;
+  });
+  let countNum = 0;
+  count.innerHTML = countNum;
+  setInterval(() => {
+    if (isRecording) {
+      countNum++;
+    }
+    count.innerHTML = countNum;
+  }, 1000);
+</script>
+</html>
