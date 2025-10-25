@@ -15,6 +15,7 @@ class LogClass {
     static LogLevel m_logLevel;
   public:
     LogClass(const LogLevel level = INFO);
+    ~LogClass();
     static void log(const std::string &msg);
     static void setLogLevel(LogLevel level);
 };
