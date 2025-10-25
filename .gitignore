@@ -1,6 +1,76 @@
+# Node.js
 node_modules/
-.vscode/
-dist/
-output/
 package-lock.json
 pnpm-lock.yaml
+
+# Build outputs
+dist/
+output/
+
+# IDE
+.vscode/
+
+# C++ compiled files and build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.dylib
+*.so
+*.a
+*.lib
+*.dll
+
+# macOS debug symbols
+*.dSYM/
+
+# C++ 可执行文件（无扩展名文件）
+# 规则：在 C++ 目录下忽略所有无扩展名的文件，但保留特定配置文件和源文件
+
+# cpp 目录
+cpp/*
+!cpp/*.*
+!cpp/*/
+# 重新忽略编译产物（因为上面的 !cpp/*.* 会包含它们）
+cpp/*.o
+cpp/*.dSYM
+
+# cppStudy 目录及其子目录
+cppStudy/*
+!cppStudy/*.*
+!cppStudy/*/
+cppStudy/*/*
+!cppStudy/*/*.*
+!cppStudy/*/*/
+# 重新忽略编译产物
+cppStudy/*.o
+cppStudy/*.dSYM
+cppStudy/*/*.o
+cppStudy/*/*.dSYM
+
+# 保留这些无扩展名的配置文件
+!Makefile
+!**/Makefile
+!README
+!LICENSE
+!Dockerfile
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+cmake-build-*/Makefile
+build/Makefile
+*.cmake
+!CMakeLists.txt
+!**/Makefile
+
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# Core dumps
+core
+core.*
